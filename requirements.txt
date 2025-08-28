@@ -1,0 +1,4 @@
+pygame
+numpy
+py2app
+jaraco.text
