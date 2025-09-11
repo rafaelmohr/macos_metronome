@@ -88,7 +88,7 @@ while running:
     # draw beat bars
     bar_width = WIDTH // BEATS_PER_BAR
     for i in range(BEATS_PER_BAR):
-        rect = pygame.Rect(i * bar_width, HEIGHT - 80, bar_width - 10, 50)
+        rect = pygame.Rect(i * bar_width + 10, HEIGHT - 80, bar_width - 20, 50)
         color = (100, 100, 100)
         if i == beat and not paused:
             color = (200, 80, 80) if i == 0 else (80, 200, 80)
@@ -97,7 +97,7 @@ while running:
     # draw pause text
     if paused:
         pause_surface = small_font.render("PAUSED", True, (200, 200, 50))
-        pause_rect = pause_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 60))
+        pause_rect = pause_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 30 ))
         screen.blit(pause_surface, pause_rect)
 
     pygame.display.flip()
