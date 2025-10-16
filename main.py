@@ -59,9 +59,9 @@ while running:
             elif event.key == pygame.K_DOWN:
                 tempo -= 5
             elif event.key == pygame.K_m:
-                BEATS_PER_BAR = max(1, min(8, BEATS_PER_BAR + 1))
+                BEATS_PER_BAR = max(1, min(32, BEATS_PER_BAR + 1))
             elif event.key == pygame.K_n:
-                BEATS_PER_BAR = max(1, min(8, BEATS_PER_BAR - 1))
+                BEATS_PER_BAR = max(1, min(32, BEATS_PER_BAR - 1))
 
 
 
