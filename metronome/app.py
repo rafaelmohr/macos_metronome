@@ -7,6 +7,7 @@ from pygame._sdl2 import video
 from metronome import config
 from metronome.audio import AudioEngine
 from metronome.key_repeater import KeyRepeater
+from metronome.resources import resource_path
 from metronome.state import MetronomeState
 from metronome.ui.beat_indicator import BeatIndicator
 from metronome.ui.bpm_display import BpmDisplay
@@ -48,6 +49,7 @@ class App:
         # onto a 1120x840 Retina area, softening every pixel we drew.
         self.window = pygame.Window(config.WINDOW_TITLE, size=(config.WIDTH, config.HEIGHT),
                                     allow_high_dpi=True)
+        self._apply_icon()
         self.renderer = video.Renderer(self.window, vsync=True)
         self.window.show()
 
@@ -60,6 +62,22 @@ class App:
         pygame.time.set_timer(TICK, self.state.interval_ms)
 
     # --- setup ---
+    def _apply_icon(self):
+        """Put our own artwork back on the window - and so on the Dock icon.
+
+        pygame gives every window it creates its own icon (the snake), and on
+        macOS SDL_SetWindowIcon feeds through to NSApplication's
+        setApplicationIconImage:, which replaces the Dock icon that Launch
+        Services already set from the bundle's icon.icns. That's why the right
+        icon flashes up at launch and is then swapped out. Setting ours here
+        wins because it happens after pygame has set its default.
+        """
+        try:
+            icon = pygame.image.load(resource_path(config.ICON_FILE))
+        except (pygame.error, OSError):
+            return  # purely cosmetic - never stop the app launching over it
+        self.window.set_icon(icon)
+
     def _framebuffer_size(self):
         """The window's true size in physical pixels (not points)."""
         viewport = self.renderer.get_viewport()

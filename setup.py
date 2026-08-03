@@ -27,7 +27,7 @@ def _pygame_resources(cmd, mf):
 _pygame_recipe.check = _pygame_resources
 
 APP = ['main.py']
-DATA_FILES = ['high.wav', 'low.wav']
+DATA_FILES = ['high.wav', 'low.wav', 'icon.png']
 OPTIONS = {
     'argv_emulation': False,
     'packages': ['pygame', 'metronome'],

@@ -103,6 +103,17 @@ window (point) coordinates, not canvas coordinates, so `App._handle_mouse_down`
 scales incoming positions by `self.scale` before hit-testing against widget
 rects, which all live in canvas space.
 
+## The Dock icon
+
+`App._apply_icon()` loads `icon.png` and sets it on the window right after
+creating it. This is not redundant with the bundle's `icon.icns`: pygame
+gives every window it creates its own icon, and on macOS `SDL_SetWindowIcon`
+feeds through to NSApplication's `setApplicationIconImage:`, which replaces
+the Dock icon Launch Services set from the bundle. Without this the correct
+icon flashes up at launch and is then swapped for the pygame snake. Ours wins
+because it is set after pygame's default. `icon.png` therefore has to ship in
+`DATA_FILES` alongside the click sounds, not just as the `iconfile`.
+
 ## Packaging note
 
 `setup.py` replaces py2app's bundled pygame recipe. That recipe (still true

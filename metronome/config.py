@@ -8,6 +8,7 @@ hardcodes a number that a designer/future-me would want to tweak.
 WIDTH, HEIGHT = 560, 420          # actual on-screen window size, in points
 FPS = 60
 WINDOW_TITLE = "Metronome"
+ICON_FILE = "icon.png"            # same artwork as icon.icns; see App._apply_icon
 
 # Note: there is deliberately no render-scale constant here. Everything is
 # drawn at the window framebuffer's real pixel count, which App detects from
