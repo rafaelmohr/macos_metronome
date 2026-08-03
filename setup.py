@@ -4,7 +4,7 @@ APP = ['main.py']
 DATA_FILES = ['high.wav', 'low.wav']
 OPTIONS = {
     'argv_emulation': False,
-    'packages': ['pygame'],
+    'packages': ['pygame', 'metronome'],
     'iconfile': 'icon.icns',
     'includes': ['jaraco.text'],
     'excludes': ['wheel'],   # <<< prevent wheel metadata duplication
