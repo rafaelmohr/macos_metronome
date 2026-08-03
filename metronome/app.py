@@ -4,7 +4,7 @@ import sys
 import pygame
 from pygame._sdl2 import video
 
-from metronome import config, sdl_hints
+from metronome import config
 from metronome.audio import AudioEngine
 from metronome.key_repeater import KeyRepeater
 from metronome.state import MetronomeState
@@ -28,54 +28,77 @@ BEATS_KEYS = {
 }
 LEGEND_KEYS = (pygame.K_h, pygame.K_SLASH)
 
+# Upstream pygame accepts a high-DPI window flag but never applies it, so the
+# whole UI comes out blurry on a Retina display. pygame-ce applies it properly.
+# Fail loudly rather than silently rendering soft - that silence was the bug.
+if not hasattr(pygame, "Window"):
+    raise SystemExit(
+        "Metronome needs pygame-ce, not upstream pygame.\n"
+        "  pip uninstall pygame && pip install -r requirements.txt"
+    )
+
 
 class App:
     def __init__(self):
         pygame.init()
-        sdl_hints.set_render_scale_quality_linear()
 
-        # A real (allow_highdpi) window + renderer, not display.set_mode():
-        # on a Retina display this gets a window whose backing framebuffer
-        # is the true physical pixel count, not just the point size - so
-        # our content is never silently upscaled/blurred by the OS after
-        # we've already rendered it. Content is still drawn onto a plain
-        # Surface (self.canvas) exactly as before; each frame that Surface
-        # is converted to a Texture and presented through the renderer,
-        # which stretches it to fill the window using linear filtering.
-        self.window = video.Window(config.WINDOW_TITLE, size=(config.WIDTH, config.HEIGHT),
-                                    allow_highdpi=True)
+        # allow_high_dpi is what makes the window's backing framebuffer the
+        # display's real physical pixel count instead of its point size.
+        # Without it macOS hands SDL a 560x420 buffer and then magnifies it
+        # onto a 1120x840 Retina area, softening every pixel we drew.
+        self.window = pygame.Window(config.WINDOW_TITLE, size=(config.WIDTH, config.HEIGHT),
+                                    allow_high_dpi=True)
         self.renderer = video.Renderer(self.window, vsync=True)
         self.window.show()
 
-        self.scale = config.RENDER_SCALE
-        # Drawing happens on this higher-resolution canvas, then each frame
-        # gets smoothly downsampled at presentation time (see _draw). That
-        # gives real supersampled anti-aliasing on top of the native window.
-        self.canvas = pygame.Surface((config.WIDTH * self.scale, config.HEIGHT * self.scale))
         self.clock = pygame.time.Clock()
-
-        self.fonts = self._load_fonts()
         self.state = MetronomeState()
         self.audio = AudioEngine()
         self.key_repeater = KeyRepeater()
 
-        self._build_ui()
+        self._sync_to_display()
         pygame.time.set_timer(TICK, self.state.interval_ms)
 
     # --- setup ---
+    def _framebuffer_size(self):
+        """The window's true size in physical pixels (not points)."""
+        viewport = self.renderer.get_viewport()
+        return viewport.width, viewport.height
+
+    def _sync_to_display(self):
+        """(Re)build the canvas, fonts and widgets for the current pixel density.
+
+        Everything is drawn at exactly the framebuffer's pixel count, so the
+        finished frame is handed to the compositor 1:1 and never resampled -
+        text is rasterized straight at its final size, which is as sharp as
+        the display can render. self.scale converts the layout's point-based
+        coordinates into those pixels (2 on Retina, 1 on a standard display).
+
+        Called again whenever the pixel count changes, e.g. when the window is
+        dragged between a Retina and a non-Retina monitor.
+        """
+        width, height = self._framebuffer_size()
+        scale = width / config.WIDTH
+        self.scale = int(scale) if float(scale).is_integer() else scale
+        self.canvas = pygame.Surface((width, height))
+        self.fonts = self._load_fonts()
+        self._build_ui()
+
     def _load_fonts(self):
-        s = self.scale
+        def sized(points, bold=False):
+            return pygame.font.SysFont(config.FONT_NAME, round(points * self.scale), bold=bold)
+
         return {
-            "bpm": pygame.font.SysFont(config.FONT_NAME, config.FONT_SIZE_BPM * s, bold=True),
-            "small": pygame.font.SysFont(config.FONT_NAME, config.FONT_SIZE_SMALL * s),
-            "hint": pygame.font.SysFont(config.FONT_NAME, config.FONT_SIZE_HINT * s),
-            "legend_title": pygame.font.SysFont(config.FONT_NAME, config.FONT_SIZE_LEGEND_TITLE * s, bold=True),
-            "legend_body": pygame.font.SysFont(config.FONT_NAME, config.FONT_SIZE_LEGEND_BODY * s),
+            "bpm": sized(config.FONT_SIZE_BPM, bold=True),
+            "small": sized(config.FONT_SIZE_SMALL),
+            "hint": sized(config.FONT_SIZE_HINT),
+            "legend_title": sized(config.FONT_SIZE_LEGEND_TITLE, bold=True),
+            "legend_body": sized(config.FONT_SIZE_LEGEND_BODY),
         }
 
     def _scaled_rect(self, x, y, w, h):
         s = self.scale
-        return pygame.Rect(x * s, y * s, w * s, h * s)
+        return pygame.Rect(round(x * s), round(y * s), round(w * s), round(h * s))
 
     def _build_ui(self):
         f = self.fonts
@@ -177,6 +200,9 @@ class App:
         self.bpm_display.update(dt_ms)
 
     def _draw(self):
+        if self.canvas.get_size() != self._framebuffer_size():
+            self._sync_to_display()
+
         s = self.scale
         canvas = self.canvas
         canvas.fill(config.Color.BACKGROUND)
@@ -196,5 +222,5 @@ class App:
 
         texture = video.Texture.from_surface(self.renderer, canvas)
         self.renderer.clear()
-        texture.draw()  # dstrect=None -> stretched to fill the whole window
+        texture.draw()  # canvas is exactly framebuffer-sized -> 1:1, no resampling
         self.renderer.present()

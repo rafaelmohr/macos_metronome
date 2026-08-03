@@ -1,3 +1,3 @@
-pygame
+pygame-ce
 py2app
 jaraco.text

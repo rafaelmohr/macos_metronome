@@ -1,6 +1,10 @@
 # Metronome App for macOS
 
-A simple, keyboard-driven metronome app for macOS, built with pygame.
+A simple, keyboard-driven metronome app for macOS, built with pygame-ce.
+
+Note: it needs **pygame-ce**, not upstream `pygame`. Upstream accepts the
+high-DPI window flag but never applies it, so the UI renders blurry on Retina
+displays; see `docs/ARCHITECTURE.md` for details.
 
 ## Controls
 Everything is keyboard-driven. Press `H` (or `?`) at any time to open the in-app legend

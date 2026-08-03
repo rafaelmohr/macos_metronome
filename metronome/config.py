@@ -9,12 +9,11 @@ WIDTH, HEIGHT = 560, 420          # actual on-screen window size, in points
 FPS = 60
 WINDOW_TITLE = "Metronome"
 
-# Everything is drawn onto an internal canvas RENDER_SCALE times larger than
-# the window, then downsampled with high-quality filtering into the window
-# each frame. This gives genuine supersampled anti-aliasing (crisp text,
-# smooth rounded corners) on any display, independent of whatever HiDPI
-# support the OS/SDL/windowing setup does or doesn't provide.
-RENDER_SCALE = 4
+# Note: there is deliberately no render-scale constant here. Everything is
+# drawn at the window framebuffer's real pixel count, which App detects from
+# the display at runtime (see App._sync_to_display). Picking a fixed scale
+# would mean resampling the finished frame to fit, which is exactly what
+# makes a UI look soft.
 
 # --- musical limits ---
 START_TEMPO = 120

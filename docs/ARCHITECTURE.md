@@ -11,7 +11,6 @@ metronome/
   state.py                  MetronomeState - the only place tempo/beats/pause/BPM-entry rules live
   audio.py                  AudioEngine - loads and plays the two click sounds
   key_repeater.py           KeyRepeater - auto-repeat for held-down keys
-  sdl_hints.py              ctypes bridge to SDL hints pygame doesn't expose (render scale quality)
   app.py                    App - owns the window/renderer, event loop, and wires everything together
   ui/
     bpm_display.py           the big BPM number; click or type digits to edit it directly
@@ -61,34 +60,52 @@ append to `state.bpm_entry_buffer`, Enter calls `confirm_bpm_edit()` (parses,
 clamps, applies), Esc calls `cancel_bpm_edit()`. Clicking anywhere else on
 the window while editing also confirms, matching common form UX.
 
-## Rendering: supersampling + a real window/renderer
+## Rendering: draw once, at the display's real pixel count
 
-Everything is drawn onto `App.canvas`, a plain `pygame.Surface` sized
-`RENDER_SCALE` (currently 4x) larger than the actual window. Every widget's
-rect and font is built at that same scale (see `App._scaled_rect` and
-`App._load_fonts`), so text and rounded corners are rasterized with real
-extra detail rather than just being stretched pixels. Each frame, that
-canvas is converted to a `pygame._sdl2.video.Texture` and presented through
-a `Renderer`, which stretches it to fill the window - `sdl_hints.py` sets
-SDL's render scale quality to `linear` first so that stretch is smooth
-rather than blocky.
+The window is created as `pygame.Window(..., allow_high_dpi=True)`. That flag
+is the whole ballgame on a Retina display: with it, SDL gives the window a
+framebuffer measured in real physical pixels (1120x840 for our 560x420-point
+window at 2x); without it, SDL gets a 560x420 buffer and macOS magnifies it
+to fill the same screen area, softening every pixel we drew.
 
-The window itself is created via `pygame._sdl2.video.Window(...,
-allow_highdpi=True)` rather than `pygame.display.set_mode()`, specifically
-to ask SDL for a window backed by the display's true physical pixel count
-(e.g. 2x on Retina) instead of just its point size - so the OS never has to
-silently upscale (and blur) our already-rendered frame after the fact.
-Whether that actually engages depends on the SDL/macOS combination it runs
-on: on the machine this was built and tested on, `allow_highdpi` measurably
-made no difference (verified by querying the window's real pixel size via
-`SDL_GetWindowSizeInPixels`, which came back equal to its point size
-regardless of the flag, the bundle's `NSHighResolutionCapable` plist entry,
-or pygame version) - a currently-unresolved SDL2/pygame limitation, not a
-bug in this app. `RENDER_SCALE` is what's actually carrying the visual
-quality in that case; if a future SDL/pygame update fixes native HiDPI
-backing, `RENDER_SCALE` could likely be lowered without losing sharpness.
+`App._sync_to_display()` reads that framebuffer's true size from
+`renderer.get_viewport()` and sizes `App.canvas` - a plain `pygame.Surface` -
+to match it exactly. `App.scale` is the ratio between the two (2 on Retina,
+1 on a standard display), and every widget rect and font is built at that
+scale (`App._scaled_rect`, `App._load_fonts`). Each frame the canvas becomes
+a `pygame._sdl2.video.Texture` and is presented through the `Renderer`;
+because the canvas is already exactly framebuffer-sized, that present is 1:1
+and nothing is ever resampled. Glyphs are rasterized straight at their final
+pixel size, which is as sharp as the display can render.
+
+`_draw` compares the canvas size against the framebuffer each frame and calls
+`_sync_to_display()` again if they diverge, so dragging the window between a
+Retina and a non-Retina monitor rebuilds the canvas and fonts at the new
+density instead of scaling the old ones.
+
+This is also why the project depends on **pygame-ce rather than upstream
+pygame**. Upstream's `pygame._sdl2.video.Window` accepts an `allow_highdpi`
+keyword - it validates the name, so a typo raises `TypeError` - but never
+actually passes `SDL_WINDOW_ALLOW_HIGHDPI` to SDL. The window silently comes
+back at point resolution, which is what made the whole UI blurry. The same
+SDL build honours the flag correctly when it's passed by hand via ctypes, and
+pygame-ce's `allow_high_dpi` (note the underscores) passes it properly. If
+you ever swap the dependency back, `app.py` raises on import rather than
+quietly rendering soft again.
+
+Because there is no supersampling any more, there is deliberately no
+render-scale constant in `config.py`. Drawing at a fixed multiple of the
+window size would mean resampling the finished frame to fit the framebuffer,
+which is exactly what softens a UI.
 
 Mouse events (`pygame.mouse.get_pos()` / `event.pos`) are reported in
 window (point) coordinates, not canvas coordinates, so `App._handle_mouse_down`
 scales incoming positions by `self.scale` before hit-testing against widget
 rects, which all live in canvas space.
+
+## Packaging note
+
+`setup.py` replaces py2app's bundled pygame recipe. That recipe (still true
+in py2app 0.28.10) hardcodes `pygame_icon.icns`, a file upstream pygame ships
+and pygame-ce doesn't, so the stock recipe aborts the build. The replacement
+copies whichever of the known pygame resource files actually exist.
