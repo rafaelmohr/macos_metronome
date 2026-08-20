@@ -1,4 +1,6 @@
 """Wires state, audio and UI widgets together and runs the event loop."""
+import ctypes
+import ctypes.util
 import sys
 
 import pygame
@@ -7,7 +9,6 @@ from pygame._sdl2 import video
 from metronome import config
 from metronome.audio import AudioEngine
 from metronome.key_repeater import KeyRepeater
-from metronome.resources import resource_path
 from metronome.state import MetronomeState
 from metronome.ui.beat_indicator import BeatIndicator
 from metronome.ui.bpm_display import BpmDisplay
@@ -63,20 +64,34 @@ class App:
 
     # --- setup ---
     def _apply_icon(self):
-        """Put our own artwork back on the window - and so on the Dock icon.
+        """Undo pygame's hijacking of the Dock icon.
 
-        pygame gives every window it creates its own icon (the snake), and on
-        macOS SDL_SetWindowIcon feeds through to NSApplication's
-        setApplicationIconImage:, which replaces the Dock icon that Launch
-        Services already set from the bundle's icon.icns. That's why the right
-        icon flashes up at launch and is then swapped out. Setting ours here
-        wins because it happens after pygame has set its default.
+        Creating a pygame.Window makes SDL push its own default icon (the
+        pygame snake) through NSApplication's setApplicationIconImage:,
+        which replaces the Dock icon Launch Services already set from the
+        bundle's icon.icns - a raw, unmasked bitmap, so it also loses the
+        rounded-squircle treatment macOS gives the bundle icon. Setting the
+        icon image back to nil is Apple's documented way to restore that
+        default (see NSApplication.applicationIconImage), so the running
+        app's Dock icon looks exactly like the one Finder shows at rest.
         """
         try:
-            icon = pygame.image.load(resource_path(config.ICON_FILE))
-        except (pygame.error, OSError):
+            objc_path = ctypes.util.find_library("objc")
+            if objc_path is None:
+                return
+            objc = ctypes.cdll.LoadLibrary(objc_path)
+            objc.objc_getClass.restype = ctypes.c_void_p
+            objc.sel_registerName.restype = ctypes.c_void_p
+            objc.objc_msgSend.restype = ctypes.c_void_p
+
+            objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+            ns_application = objc.objc_getClass(b"NSApplication")
+            shared_app = objc.objc_msgSend(ns_application, objc.sel_registerName(b"sharedApplication"))
+
+            objc.objc_msgSend.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
+            objc.objc_msgSend(shared_app, objc.sel_registerName(b"setApplicationIconImage:"), None)
+        except OSError:
             return  # purely cosmetic - never stop the app launching over it
-        self.window.set_icon(icon)
 
     def _framebuffer_size(self):
         """The window's true size in physical pixels (not points)."""
