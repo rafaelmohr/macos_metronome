@@ -95,6 +95,11 @@ struct ContentView: View {
         clock.start(intervalMs: state.intervalMs)
 
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .keyUp]) { event in
+            // Let Command-key combos (Cmd+W, Cmd+Q, Cmd+H, ...) fall through
+            // to the standard menu/window handling instead of being eaten -
+            // none of our own shortcuts use Command.
+            guard !event.modifierFlags.contains(.command) else { return event }
+
             if event.type == .keyDown {
                 handleKeyDown(event)
             } else {
