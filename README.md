@@ -1,10 +1,7 @@
 # Metronome App for macOS
 
-A simple, keyboard-driven metronome app for macOS, built with pygame-ce.
-
-Note: it needs **pygame-ce**, not upstream `pygame`. Upstream accepts the
-high-DPI window flag but never applies it, so the UI renders blurry on Retina
-displays; see `docs/ARCHITECTURE.md` for details.
+A simple, keyboard-driven metronome app for macOS, built natively in Swift
+and SwiftUI.
 
 ## Controls
 Everything is keyboard-driven. Press `H` (or `?`) at any time to open the in-app legend
@@ -20,36 +17,40 @@ Hold any of the above down to keep changing the value - it speeds up the longer 
 
 ``Spacebar`` for Pause.
 
-``0-9`` (or click the BPM number) to start typing an exact BPM, ``Enter`` to confirm, ``Esc`` to cancel.
+``0-9`` (or click the BPM number) to start typing an exact BPM, ``Enter`` to confirm,
+``Esc`` to cancel. Typing also auto-confirms about a second after you stop.
+
+## Requirements
+Full Xcode (not just the Command Line Tools), on macOS 14 or later.
 
 ## Code structure
-The app lives in the `metronome/` package (state, audio, UI widgets, main app loop),
-with `main.py` as a thin entry point. See `docs/ARCHITECTURE.md` for a tour of how it
-fits together.
-
-## Install
-First create & activate venv, then install dependencies.
-```
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip wheel
-
-pip install -r requirements.txt
-```
+The app lives in `swift/Sources/Metronome` (state, audio, key handling, SwiftUI views),
+with `MetronomeApp.swift` as the entry point. It's a Swift Package, so Xcode opens it
+directly - no `.xcodeproj` needed.
 
 ## Dev
-Run
+Open the package in Xcode and hit Run:
 ```
-python main.py
+xed swift
 ```
-for development testing.
+or run it from the command line:
+```
+cd swift
+swift run
+```
+
+## Test
+```
+cd swift
+swift test
+```
 
 ## Build
-Run 
 ```
-rm -rf build dist
-python setup.py py2app
+cd swift
+./Scripts/build_app.sh
 ```
-which should generate ``Metronome.app`` in ``/dist``. You can copy this wherever you like.
+which generates `Metronome.app` in `swift/dist`. You can copy this wherever you like.
 
-The sound files ``high.wav`` and ``low.wav`` can be swapped out.
+The sound files ``high.wav`` and ``low.wav`` (bundled in `swift/Sources/Metronome/Resources`)
+can be swapped out.
